@@ -1,5 +1,5 @@
 
 class Echo:
-    def get(self, data):
-        return data
+    def get(self, query):
+        return query
 

@@ -22,15 +22,15 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     @error.handlesafely
     def do_GET(self):
-        (kind, path, data) = self._request()
+        (kind, path, query) = self._request()
 
         if kind == ServerHandler.API_KIND:
             handler = path.replace("/", "_")
 
             if handler in self.server.handlers:
                 # Only log requests that go to the handlers to reduce logging noise.
-                logging.debug("GET %s: %s" % (path, data))
-                out = self.server.handlers[handler].get(data)
+                logging.debug("GET %s: %s" % (path, query))
+                out = self.server.handlers[handler].get(query)
 
                 if out == None:
                     out = {}
@@ -78,7 +78,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     def _request(self):
         url = urllib.parse.urlparse(self.path)
-        request_data = urllib.parse.parse_qs(url.query)
+        request_query = urllib.parse.parse_qs(url.query)
         request_path = urllib.parse.unquote(url.path[1:])
         request_type = ServerHandler.RESOURCE_KIND
 
@@ -86,7 +86,7 @@ class ServerHandler(BaseHTTPRequestHandler):
             request_type = ServerHandler.API_KIND
             request_path = request_path.replace(self.server.api_root, "")
 
-        return (request_type, request_path, request_data)
+        return (request_type, request_path, request_query)
 
     def _set_headers(self, content_type, others={}):
         self.send_response(200)
