@@ -22,28 +22,32 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     @error.handlesafely
     def do_GET(self):
-        (kind, path, query) = self._request()
+        (kind, path, handler, query, _) = self._request()
 
         if kind == ServerHandler.API_KIND:
-            handler = path.replace("/", "_")
-
             if handler in self.server.handlers:
                 # Only log requests that go to the handlers to reduce logging noise.
                 logging.debug("GET %s: %s" % (path, query))
+
+                if not hasattr(self.server.handlers[handler], "get"):
+                    raise error.NotAllowed(path, "get")
+
                 out = self.server.handlers[handler].get(query)
 
                 if out == None:
                     out = {}
 
-                self._set_headers("application/json")
+                self._set_headers()
 
                 if hasattr(out, "as_json"):
                     out = out.as_json()
 
-                return self._response_content(json.dumps(out))
+                self._response_content(json.dumps(out))
+                # return to avoid falling through to the final raise statement
+                return
         elif kind == ServerHandler.RESOURCE_KIND:
             # The request is for a file on the file system.
-            file_path = os.path.join(".", self.server.resource_path, path)
+            file_path = os.path.join(".", self.server.resource_path, path[1:])
 
             # Some systems allow for relative paths to pass through urllib.
             # Make sure the constructed path is a subpath of the server's resource path.
@@ -58,7 +62,37 @@ class ServerHandler(BaseHTTPRequestHandler):
 
                 self._set_headers(mimetype)
                 encode = "text" in mimetype
-                return self._response_file(file_path, encode)
+                self._response_file(file_path, encode)
+                # return to avoid falling through to the final raise statement
+                return
+
+        raise error.NotFound(path)
+
+    @error.handlesafely
+    def do_POST(self):
+        (kind, path, handler, query, data) = self._request()
+
+        if kind == ServerHandler.API_KIND:
+            if handler in self.server.handlers:
+                # Only log requests that go to the handlers to reduce logging noise.
+                logging.debug("POST %s: %s | %s" % (path, query, data))
+
+                if not hasattr(self.server.handlers[handler], "post"):
+                    raise error.NotAllowed(path, "post")
+
+                out = self.server.handlers[handler].post(query, data)
+
+                if out == None:
+                    out = {}
+
+                self._set_headers()
+
+                if hasattr(out, "as_json"):
+                    out = out.as_json()
+
+                self._response_content(json.dumps(out))
+                # return to avoid falling through to the final raise statement
+                return
 
         raise error.NotFound(path)
 
@@ -70,27 +104,35 @@ class ServerHandler(BaseHTTPRequestHandler):
             with open(file_path, "rb") as fh:
                 self.wfile.write(fh.read())
 
-        return None
-
     def _response_content(self, content):
         self.wfile.write(content.encode("utf-8"))
-        return None
 
     def _request(self):
         url = urllib.parse.urlparse(self.path)
-        request_query = urllib.parse.parse_qs(url.query)
-        request_path = urllib.parse.unquote(url.path[1:])
         request_type = ServerHandler.RESOURCE_KIND
+        request_path = urllib.parse.unquote(url.path[1:])
+        request_handler = None
+        request_query = urllib.parse.parse_qs(url.query)
+        request_data = None
 
         if request_path.startswith(self.server.api_root):
             request_type = ServerHandler.API_KIND
-            request_path = request_path.replace(self.server.api_root, "")
+            request_handler = request_path.replace(self.server.api_root, "").replace("/", "_")
 
-        return (request_type, request_path, request_query)
+        if "Content-Length" in self.headers:
+            content_length = int(self.headers["Content-Length"])
+            content = self.rfile.read(content_length).decode("utf-8")
 
-    def _set_headers(self, content_type, others={}):
+            try:
+                request_data = json.loads(content)
+            except json.JSONDecodeError:
+                request_data = content
+
+        return (request_type, "/" + request_path, request_handler, request_query, request_data)
+
+    def _set_headers(self, content_type=None, others={}):
         self.send_response(200)
-        self.send_header('Content-type', content_type)
+        self.send_header('Content-Type', "application/json" if content_type is None else content_type)
 
         for key, value in others.items():
             self.send_header(key, value)
@@ -106,7 +148,7 @@ def run_server(port, api_root, resource_path, handler_map):
     httpd = ThreadingHTTPServer(server_address, ServerHandler)
     httpd.daemon_threads = True
     httpd.api_root = api_root if api_root.endswith("/") else "%s/" % api_root
-    httpd.resource_path = resource_path
+    httpd.resource_path = resource_path if resource_path.endswith("/") else "%s/" % resource_path
     httpd.handlers = handler_map
     user_log.info('Starting httpd %d...' % port)
     httpd.serve_forever()
