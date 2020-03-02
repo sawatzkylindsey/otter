@@ -65,11 +65,10 @@ def handlesafely(function):
 
             if isinstance(error, HttpError):
                 self.send_header('Content-Type', "application/json")
+                self.end_headers()
                 self.wfile.write(json.dumps(error.as_json(code)).encode("utf-8"))
             else:
                 self.wfile.write(error_message.encode("utf-8"))
-
-            self.end_headers()
 
     return wrapper
 
