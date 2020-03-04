@@ -6,6 +6,9 @@ import traceback
 
 
 class HttpError(Exception):
+    def __init__(self):
+        super().__init__()
+
     def as_json(self, code):
         return {
             "error": {
@@ -17,6 +20,7 @@ class HttpError(Exception):
 
 class Invalid(HttpError):
     def __init__(self, reason):
+        super().__init__()
         self.reason = reason
 
     def __repr__(self):
@@ -25,6 +29,7 @@ class Invalid(HttpError):
 
 class NotFound(HttpError):
     def __init__(self, path):
+        super().__init__()
         self.path = path
 
     def __repr__(self):
@@ -33,6 +38,7 @@ class NotFound(HttpError):
 
 class NotAllowed(HttpError):
     def __init__(self, path, method):
+        super().__init__()
         self.path = path
         self.method = method
 
