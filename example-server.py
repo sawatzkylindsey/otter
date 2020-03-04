@@ -19,6 +19,7 @@ def main(argv):
     logging.debug(aargs)
     run_server(aargs.port, "api", "resources", {
         "echo": Echo(),
+        "echo/echo": Echo(),
     })
     return 0
 

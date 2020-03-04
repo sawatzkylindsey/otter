@@ -117,7 +117,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         if request_path.startswith(self.server.api_root):
             request_type = ServerHandler.API_KIND
-            request_handler = request_path.replace(self.server.api_root, "").replace("/", "_")
+            request_handler = request_path.replace(self.server.api_root, "")
 
         if "Content-Length" in self.headers:
             content_length = int(self.headers["Content-Length"])
