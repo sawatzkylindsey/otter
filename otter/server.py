@@ -14,6 +14,7 @@ from otter import error
 from otter import handler
 
 from pytils.log import user_log
+import pytils.override
 
 
 class ServerHandler(BaseHTTPRequestHandler):
@@ -42,7 +43,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                 if hasattr(out, "as_json"):
                     out = out.as_json()
 
-                self._response_content(json.dumps(out))
+                self._response_content(content_serialize(out))
                 # return to avoid falling through to the final raise statement
                 return
         elif kind == ServerHandler.RESOURCE_KIND:
@@ -90,7 +91,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                 if hasattr(out, "as_json"):
                     out = out.as_json()
 
-                self._response_content(json.dumps(out))
+                self._response_content(content_serialize(out))
                 # return to avoid falling through to the final raise statement
                 return
 
@@ -152,4 +153,12 @@ def run_server(port, api_root, resource_path, handler_map):
     httpd.handlers = handler_map
     user_log.info('Starting httpd %d...' % port)
     httpd.serve_forever()
+
+
+def content_serialize(out):
+    try:
+        pytils.override.patch_json_encode()
+        return json.dumps(out, indent=4, separators=(", ", ": "))
+    finally:
+        pytils.override.unpatch_json_encode()
 
