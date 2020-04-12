@@ -6,30 +6,31 @@ import traceback
 
 
 class HttpError(Exception):
-    def __init__(self):
+    def __init__(self, code):
         super().__init__()
+        self.code = code
 
-    def as_json(self, code):
+    def as_json(self):
         return {
             "error": {
-                "code": code,
+                "code": self.code,
                 "message": repr(self),
             }
         }
 
 
-class Invalid(HttpError):
+class BadRequest(HttpError):
     def __init__(self, reason):
-        super().__init__()
+        super().__init__(400)
         self.reason = reason
 
     def __repr__(self):
-        return "Invalid: %s" % self.reason
+        return "BadRequest: %s" % self.reason
 
 
 class NotFound(HttpError):
     def __init__(self, path):
-        super().__init__()
+        super().__init__(404)
         self.path = path
 
     def __repr__(self):
@@ -38,19 +39,12 @@ class NotFound(HttpError):
 
 class NotAllowed(HttpError):
     def __init__(self, path, method):
-        super().__init__()
+        super().__init__(405)
         self.path = path
         self.method = method
 
     def __repr__(self):
         return "NotAllowed: %s %s" % (self.method, self.path)
-
-
-MAPPING = {
-    Invalid: 400,
-    NotFound: 404,
-    NotAllowed: 405,
-}
 
 
 def handlesafely(function):
@@ -62,18 +56,19 @@ def handlesafely(function):
             error_message = repr(error)
             traceback_message = "".join(traceback.format_exception(error_type, error, error.__traceback__, chain=False)).strip()
             logging.error("Handling %s.%s\n%s" % (error_type.__module__, error_message, traceback_message))
-            code = 500
 
-            if error_type in MAPPING:
-                code = MAPPING[error_type]
-
-            self.send_response(code)
+            if isinstance(error, HttpError):
+                self.send_response(error.code)
+            else:
+                self.send_response(500)
 
             if isinstance(error, HttpError):
                 self.send_header('Content-Type', "application/json")
                 self.end_headers()
-                self.wfile.write(json.dumps(error.as_json(code)).encode("utf-8"))
+                self.wfile.write(json.dumps(error.as_json()).encode("utf-8"))
             else:
+                self.send_header('Content-Type', "text/plain")
+                self.end_headers()
                 self.wfile.write(error_message.encode("utf-8"))
 
     return wrapper
