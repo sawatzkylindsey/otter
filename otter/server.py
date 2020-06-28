@@ -38,12 +38,13 @@ class ServerHandler(BaseHTTPRequestHandler):
                 if out == None:
                     out = {}
 
-                self._set_headers()
 
                 if hasattr(out, "as_json"):
                     out = out.as_json()
 
-                self._response_content(content_serialize(out))
+                response = content_serialize(out)
+                self._set_headers()
+                self._response_content(response)
                 # return to avoid falling through to the final raise statement
                 return
         elif kind == ServerHandler.RESOURCE_KIND:
@@ -61,8 +62,8 @@ class ServerHandler(BaseHTTPRequestHandler):
                 if mimetype is None:
                     mimetype = "text/plain"
 
-                self._set_headers(mimetype)
                 encode = "text" in mimetype
+                self._set_headers(mimetype)
                 self._response_file(file_path, encode)
                 # return to avoid falling through to the final raise statement
                 return
@@ -86,12 +87,12 @@ class ServerHandler(BaseHTTPRequestHandler):
                 if out == None:
                     out = {}
 
-                self._set_headers()
-
                 if hasattr(out, "as_json"):
                     out = out.as_json()
 
-                self._response_content(content_serialize(out))
+                response = content_serialize(out)
+                self._set_headers()
+                self._response_content(response)
                 # return to avoid falling through to the final raise statement
                 return
 
@@ -126,8 +127,8 @@ class ServerHandler(BaseHTTPRequestHandler):
 
             try:
                 request_data = json.loads(content)
-            except json.JSONDecodeError:
-                request_data = content
+            except json.JSONDecodeError as e:
+                raise error.BadRequest("Error decoding json: %s" % str(e))
 
         return (request_type, "/" + request_path, request_handler, request_query, request_data)
 
