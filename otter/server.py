@@ -23,7 +23,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     @error.handlesafely
     def do_GET(self):
-        (kind, path, handler, query, _) = self._request()
+        (kind, path, handler, query, _, _) = self._request()
 
         if kind == ServerHandler.API_KIND:
             if handler in self.server.handlers:
@@ -72,12 +72,12 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     @error.handlesafely
     def do_POST(self):
-        (kind, path, handler, query, data) = self._request()
+        (kind, path, handler, query, data, content) = self._request()
 
         if kind == ServerHandler.API_KIND:
             if handler in self.server.handlers:
                 # Only log requests that go to the handlers to reduce logging noise.
-                logging.debug("POST %s: %s | %s" % (path, query, data))
+                logging.debug("POST %s: %s | %s" % (path, query, truncate(content)))
 
                 if not hasattr(self.server.handlers[handler], "post"):
                     raise error.NotAllowed(path, "post")
@@ -129,8 +129,10 @@ class ServerHandler(BaseHTTPRequestHandler):
                 request_data = json.loads(content)
             except json.JSONDecodeError as e:
                 raise error.BadRequest("Error decoding json: %s" % str(e))
+        else:
+            content = None
 
-        return (request_type, "/" + request_path, request_handler, request_query, request_data)
+        return (request_type, "/" + request_path, request_handler, request_query, request_data, content)
 
     def _set_headers(self, content_type=None, others={}):
         self.send_response(200)
@@ -162,4 +164,16 @@ def content_serialize(out):
         return json.dumps(out, indent=4, separators=(", ", ": "))
     finally:
         pytils.override.unpatch_json_encode()
+
+
+def truncate(value):
+    if value is None:
+        return None
+
+    v = str(value)
+
+    if len(v) > 100:
+        return v[:97] + "..."
+
+    return v
 
