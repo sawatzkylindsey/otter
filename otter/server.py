@@ -23,6 +23,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     @error.handlesafely
     def do_GET(self):
+        self._check_whitelist()
         (kind, path, handler, query, _, _) = self._request()
 
         if kind == ServerHandler.API_KIND:
@@ -72,6 +73,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     @error.handlesafely
     def do_POST(self):
+        self._check_whitelist()
         (kind, path, handler, query, data, content) = self._request()
 
         if kind == ServerHandler.API_KIND:
@@ -143,8 +145,15 @@ class ServerHandler(BaseHTTPRequestHandler):
 
         self.end_headers()
 
+    def _check_whitelist(self):
+        ip_address = self.client_address[0]
 
-def run_server(port, api_root, resource_path, handler_map):
+        if self.server.ip_whitelist is not None \
+            and ip_address not in self.server.ip_whitelist:
+            raise error.Forbidden()
+
+
+def run_server(port, api_root, resource_path, handler_map, ip_whitelist=["127.0.0.1"]):
     class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
         pass
 
@@ -154,6 +163,7 @@ def run_server(port, api_root, resource_path, handler_map):
     httpd.api_root = api_root if api_root.endswith("/") else "%s/" % api_root
     httpd.resource_path = resource_path if resource_path.endswith("/") else "%s/" % resource_path
     httpd.handlers = handler_map
+    httpd.ip_whitelist = ip_whitelist
     user_log.info('Starting httpd %d...' % port)
     httpd.serve_forever()
 

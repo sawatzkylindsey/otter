@@ -6,9 +6,10 @@ import traceback
 
 
 class HttpError(Exception):
-    def __init__(self, code):
+    def __init__(self, code, log):
         super().__init__()
         self.code = code
+        self.log = log
 
     def as_json(self):
         return {
@@ -21,16 +22,24 @@ class HttpError(Exception):
 
 class BadRequest(HttpError):
     def __init__(self, reason):
-        super().__init__(400)
+        super().__init__(400, True)
         self.reason = reason
 
     def __repr__(self):
         return "BadRequest: %s" % self.reason
 
 
+class Forbidden(HttpError):
+    def __init__(self):
+        super().__init__(403, False)
+
+    def __repr__(self):
+        return "Forbidden"
+
+
 class NotFound(HttpError):
     def __init__(self, path):
-        super().__init__(404)
+        super().__init__(404, True)
         self.path = path
 
     def __repr__(self):
@@ -39,7 +48,7 @@ class NotFound(HttpError):
 
 class NotAllowed(HttpError):
     def __init__(self, path, method):
-        super().__init__(405)
+        super().__init__(405, True)
         self.path = path
         self.method = method
 
@@ -52,10 +61,16 @@ def handlesafely(function):
         try:
             function(self)
         except Exception as error:
-            error_type = type(error)
-            error_message = repr(error)
-            traceback_message = "".join(traceback.format_exception(error_type, error, error.__traceback__, chain=False)).strip()
-            logging.error("Handling %s.%s\n%s" % (error_type.__module__, error_message, traceback_message))
+            log_error = True
+
+            if isinstance(error, HttpError):
+                log_error = error.log
+
+            if log_error:
+                error_type = type(error)
+                error_message = repr(error)
+                traceback_message = "".join(traceback.format_exception(error_type, error, error.__traceback__, chain=False)).strip()
+                logging.error("Handling %s.%s\n%s" % (error_type.__module__, error_message, traceback_message))
 
             if isinstance(error, HttpError):
                 self.send_response(error.code)
