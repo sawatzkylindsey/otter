@@ -1,6 +1,5 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import json
 import logging
 import mimetypes
 import os
@@ -12,9 +11,9 @@ import urllib
 
 from otter import error
 from otter import handler
+from otter import serializer
 
 from pytils.log import user_log
-import pytils.override
 
 
 class ServerHandler(BaseHTTPRequestHandler):
@@ -43,7 +42,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                 if hasattr(out, "as_json"):
                     out = out.as_json()
 
-                response = content_serialize(out)
+                response = serializer.to_string(out)
                 self._set_headers()
                 self._response_content(response)
                 # return to avoid falling through to the final raise statement
@@ -92,7 +91,7 @@ class ServerHandler(BaseHTTPRequestHandler):
                 if hasattr(out, "as_json"):
                     out = out.as_json()
 
-                response = content_serialize(out)
+                response = serializer.to_string(out)
                 self._set_headers()
                 self._response_content(response)
                 # return to avoid falling through to the final raise statement
@@ -126,11 +125,7 @@ class ServerHandler(BaseHTTPRequestHandler):
         if "Content-Length" in self.headers:
             content_length = int(self.headers["Content-Length"])
             content = self.rfile.read(content_length).decode("utf-8")
-
-            try:
-                request_data = json.loads(content)
-            except json.JSONDecodeError as e:
-                raise error.BadRequest("Error decoding json: %s" % str(e))
+            request_data = serializer.from_string(content)
         else:
             content = None
 
@@ -166,14 +161,6 @@ def run_server(port, api_root, resource_path, handler_map, ip_whitelist=["127.0.
     httpd.ip_whitelist = ip_whitelist
     user_log.info('Starting httpd %d...' % port)
     httpd.serve_forever()
-
-
-def content_serialize(out):
-    try:
-        pytils.override.patch_json_encode()
-        return json.dumps(out, indent=4, separators=(", ", ": "))
-    finally:
-        pytils.override.unpatch_json_encode()
 
 
 def truncate(value):

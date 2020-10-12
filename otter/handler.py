@@ -1,8 +1,8 @@
 
 class Echo:
     def get(self, query):
-        return str(query)
+        return "query=%s" % (query)
 
     def post(self, query, data):
-        return str((query, data))
+        return "query=%s, data=%s" % (query, data)
 
